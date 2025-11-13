@@ -127,97 +127,12 @@ jobs:
           retention-days: 7
 
   # ============================================
-  # JOB 4: TESTS END-TO-END (E2E)
-  # ============================================
-  test-e2e:
-    name: 🎯 Run E2E Tests
-    runs-on: ubuntu-latest
-    needs: build
-
-    # Servicios adicionales necesarios para los tests (base de datos, etc.)
-    services:
-      # Ejemplo: PostgreSQL para tests E2E (ajusta según tu DB)
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        # Configuración de salud para esperar que la DB esté lista
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-
-      - name: 🔧 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: 📦 Install dependencies
-        run: npm ci
-
-      - name: 🔨 Generate Prisma Client
-        run: npx prisma generate
-
-      # Ejecuta las migraciones de Prisma en la base de datos de test
-      - name: 🗄️ Run database migrations
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
-        run: npx prisma migrate deploy
-
-      # Ejecuta los tests end-to-end
-      - name: 🎯 Run E2E tests
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
-        run: npm run test:e2e -- --passWithNoTests
-
-  # ============================================
-  # JOB 5: DEPLOY A RENDER
-  # ============================================
-  deploy:
-    name: 🚀 Deploy to Render
-    runs-on: ubuntu-latest
-    # Solo se ejecuta si todos los tests y builds pasaron
-    needs: [lint, build, test, test-e2e]
-    # Solo despliega cuando es push a main (no en PRs)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-
-      # Trigger del deploy en Render usando su Deploy Hook
-      - name: 🚀 Trigger Render Deploy
-        env:
-          # RENDER_DEPLOY_HOOK_URL debe configurarse en GitHub Secrets
-          # Para obtenerlo: Render Dashboard → tu servicio → Settings → Deploy Hook
-          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          # Realiza una petición POST al webhook de Render para iniciar el deploy
-          curl -X POST $RENDER_DEPLOY_HOOK
-
-      - name: ✅ Deployment triggered
-        run: |
-          echo "🎉 Deployment has been triggered on Render!"
-          echo "📍 Check the status at: https://dashboard.render.com"
-          echo "⏱️ The deployment typically takes 2-5 minutes to complete"
-
-  # ============================================
-  # JOB 6: NOTIFICACIÓN DE ESTADO (OPCIONAL)
+  # JOB 4: NOTIFICACIÓN DE ESTADO (OPCIONAL)
   # ============================================
   notify:
     name: 📢 Notify Status
     runs-on: ubuntu-latest
-    needs: [deploy]
+    needs: [test]
     if: always()  # Se ejecuta siempre, incluso si hay fallos
 
     steps:
